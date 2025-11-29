@@ -1,0 +1,53 @@
+Assignment: MPI Trapezoid Integration (with timing)
+
+Files included:
+1) integrate.cpp        - serial version (prints Init, Compute, Comm, Total)
+2) func.cpp             - f(x) = x^2 + 3x + 10
+3) mpi_integrate_v1.cpp - MPI point-to-point, master receives in order (1..p-1)
+4) mpi_integrate_v2.cpp - MPI point-to-point, master receives from MPI_ANY_SOURCE
+5) mpi_integrate_v3.cpp - MPI collective (MPI_Reduce)
+6) integrate.txt        - this file (description + pseudocode + brief discussion)
+7) Makefile             - build & test targets
+
+Pseudocode (common - trapezoid rule):
+------------------------------------
+read a, b, n
+h = (b - a) / n
+partition n into local_n for each process (handle remainder)
+local_a = a + start_index * h
+local_b = local_a + local_n * h
+
+local_sum = (f(local_a) + f(local_b)) / 2
+for i = 1 to local_n-1:
+    local_sum += f(local_a + i*h)
+local_integral = h * local_sum
+
+// communication
+v1: send local_integral from ranks 1..p-1 to rank 0; rank 0 receives in order
+v2: same but rank 0 receives with MPI_ANY_SOURCE
+v3: use MPI_Reduce to sum local_integral to rank 0
+
+Timing:
+For serial: use clock() to measure init, compute, comm (0), total
+For MPI: use MPI_Wtime() to measure init, compute, comm, total
+Print per-process timing: Init, Compute, Comm, Total
+Rank 0 prints final result.
+
+Discussion (how to test and what to expect):
+-------------------------------------------
+- Build: run `make`
+- Tests:
+    make test1    # ./integrate 1 4 100
+    make test2    # mpirun -np 4 ./mpi_integrate_v1 1 4 100
+    make test3    # mpirun -np 4 ./mpi_integrate_v2 1 4 100
+    make test4    # mpirun -np 4 ./mpi_integrate_v3 1 4 100
+
+- Run experiments with np = 1..6 and n large (e.g., 10000000) to see speedup.
+- Expectation:
+    * Init time small.
+    * Compute time reduces roughly by factor ~p if n >> p and balanced.
+    * Comm time increases with p (more messages) for v1/v2; v3 usually cheaper.
+    * Total time = init + compute + comm; optimal p depends on workload vs comm cost.
+
+Note:
+- Filenames and interface match assignment instructions exactly.
